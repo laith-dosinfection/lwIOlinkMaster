@@ -1,7 +1,6 @@
 #ifndef __IO_LINK_PORT_H__
 #define __IO_LINK_PORT_H__
 
-#include "../src/utility/m5unified_common.h"
 #if __has_include ( <driver/uart.h> )
 
 #include <driver/uart.h>
@@ -354,9 +353,6 @@ namespace IOlink
     /// @param UART_TX_pin TX pin
     /// @return 
     //bool configureUARTPort(uint8_t UART_RX_pin,uint8_t UART_TX_pin);
-
-    
-
     
   };
 
@@ -399,7 +395,7 @@ namespace IOlink
         // Other 5 bits
 
     };
-  }
+  };
 
 }
 

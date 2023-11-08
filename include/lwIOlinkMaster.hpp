@@ -25,6 +25,16 @@ namespace IOlink
         master(){};
         ~master(){};
 
+        void begin()
+        {
+
+        };
+
+        void handle()
+        {
+
+        };
+
         int8_t getNumPorts()
         {
             return num_ports;
