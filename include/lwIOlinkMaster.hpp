@@ -7,36 +7,36 @@
 #include <sdkconfig.h>
 #endif
 
+#include <vector>
+
+/// global instance.
+//IOlink::Master master;
+
 namespace IOlink
 {
-    typedef enum
+    class Master
     {
-        UART,
-        I2C,
-        SPI
-    } PHY_comm_t;
-
-    class master
-    {
-    protected:
-        int8_t num_ports = 1;
-        PHY_comm_t interface = UART;
-
     public:
-        master()
+        typedef enum
         {
-            for (int i = 0; i < num_ports; i++)
-            {
-                Port *p[i] = new Port(master * Master);
-            }
-        };
-        ~master(){};
+            UART,
+            I2C,
+            SPI
+        } PHY_comm_t;
+        
+        //typedef std::vector<Port>;
+
+        Master(){};
+        ~Master(){};
 
         void begin(){
-
+            for (int i = 0; i < num_ports; i++)
+            {
+                //Port *p[i] = new Port();
+            }
         };
 
-        void handle(){
+        void update(){
 
         };
 
@@ -57,9 +57,10 @@ namespace IOlink
         {
             interface = _interface;
         };
+    protected:
+        int8_t num_ports = 1;
+        PHY_comm_t interface = UART;
     };
-
-    master *Master;
 };
 
 #endif

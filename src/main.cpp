@@ -12,14 +12,13 @@
 
 #include "lwIOlinkMaster.h"
 
+IOlink::UARTSIO port1;
 
 void setup(void)
 {
-  shared_ptr<master> m(new IOlink::Master());
-  
-  IOlink::Master.begin();
+  //master.begin();
 }
 
 void loop(){
-  IOlink::Master.handle();
+  //master.update();
 }
