@@ -15,6 +15,8 @@
 
 void setup(void)
 {
+  shared_ptr<master> m(new IOlink::Master());
+  
   IOlink::Master.begin();
 }
 

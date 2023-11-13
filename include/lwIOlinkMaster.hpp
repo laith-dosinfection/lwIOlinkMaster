@@ -1,5 +1,5 @@
-#ifndef __LW_IO_LINK_MASTER_HPP__
-#define __LW_IO_LINK_MASTER_HPP__
+#ifndef __LW_IO_LINK_MASTER_H__
+#define __LW_IO_LINK_MASTER_H__
 
 #include "utility/iolinkPort.hpp"
 
@@ -9,29 +9,34 @@
 
 namespace IOlink
 {
-   class master
-   {
-        protected:
-        enum PHY_comm_t
+    typedef enum
+    {
+        UART,
+        I2C,
+        SPI
+    } PHY_comm_t;
+
+    class master
+    {
+    protected:
+        int8_t num_ports = 1;
+        PHY_comm_t interface = UART;
+
+    public:
+        master()
         {
-            UART,
-            I2C,
-            SPI
+            for (int i = 0; i < num_ports; i++)
+            {
+                Port *p[i] = new Port(master * Master);
+            }
         };
-        int8_t num_ports;
-        PHY_comm_t interface;
-        public:
-        
-        master(){};
         ~master(){};
 
-        void begin()
-        {
+        void begin(){
 
         };
 
-        void handle()
-        {
+        void handle(){
 
         };
 
@@ -52,9 +57,9 @@ namespace IOlink
         {
             interface = _interface;
         };
-   };
+    };
 
-   master *Master;
+    master *Master;
 };
 
 #endif

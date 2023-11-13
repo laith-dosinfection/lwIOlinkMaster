@@ -1,9 +1,10 @@
 #ifndef __IO_LINK_PORT_H__
 #define __IO_LINK_PORT_H__
 
-#if __has_include ( <driver/uart.h> )
+#if __has_include(<driver/uart.h> )
 
 #include <driver/uart.h>
+#include "lwIOlinkMaster.hpp"
 
 #endif
 
@@ -13,117 +14,154 @@
 
 namespace IOlink
 {
-  class Port: public master 
+
+  class Port
   {
-      protected:
-      enum mode_t
+  public:
+    typedef enum
+    {
+      DEACTIVATED,
+      IOL_MANUAL,
+      IOL_AUTOSTART,
+      DI_CQ,
+      DO_CQ
+    } mode_t;
+
+    Port(int n, mode_t m)
+    {
+      setPortNum(n);
+      switch (m)
       {
-          DEACTIVATED,
-          IOL_MANUAL,
-          IOL_AUTOSTART,
-          DI_CQ,
-          DO_CQ 
-      };
-      mode_t mode = DEACTIVATED;
-      
-      public:
-      Port(){};
-      ~Port(){};
-      
-      /// @brief define the fuction of the port, set it as IO link/DI/DO
-      /// @param port_mode enum of port modes
-      void setPortMode(mode_t _mode){
-        mode = _mode;
-      };
-      /// @brief return the enum mode of the port
-      /// @return enum port_mode_t DEACTIVATED, IOL_manual, IOL_auto, DI, DO
-      mode_t getPortMode(){
-        return mode;
-      };      
+      case IOL_AUTOSTART
+      SIOComm(n);
+          break;
+
+          default:
+        break;
+      }
+    };
+    ~Port() { delete (mst); };
+
+    /// @brief define the fuction of the port, set it as IO link/DI/DO
+    /// @param port_mode enum of port modes
+    void setPortMode(mode_t _mode)
+    {
+      mode = _mode;
+    };
+    /// @brief return the enum mode of the port
+    /// @return enum port_mode_t DEACTIVATED, IOL_manual, IOL_auto, DI, DO
+    mode_t getPortMode()
+    {
+      return mode;
+    };
+
+    void setPortNum(int n)
+    {
+      port_num = n;
+    };
+
+    uint8_t getPortNum()
+    {
+      return port_num;
+    }
+
+  protected:
+    mode_t mode = DEACTIVATED;
+    int port_num;
   };
 
-  class SIOComm :public Port
+  // SIO should inherit a port pointer
+  class SIOComm
   {
-    protected:
-    enum baud_t{
+  public:
+    typedef enum
+    {
       NOT_DETECTED,
       COM1,
       COM2,
       COM3
-    };
-    baud_t baud = NOT_DETECTED; //baud rate as an enum
-    uint32_t rate = 0; //the baud rate of comm
-    uint8_t bitRate = 0; //the bitrate of comm in uS
-    uint8_t t_dmt_s = 0;//Actual time of delay
+    } baud_t;
 
-    enum state_t
+    typedef enum
     {
       IDLE,
       WAKE,
       ESTABLISHING_COMM,
       SIO,
       SDCI
-    };
-    state_t state = IDLE;
-
-    public:
-    SIOComm();
-    ~SIOComm();
+    } state_t;
 
     /// @brief Wake-Up paremeters are IO link master stack constants for establishing communication
     /// with an IO link slave device for a given IO link master port
     const union wake_parameters_t
     {
-      uint8_t t_wu : 80; //the wake up request pulse time, minimum time is 75uS, maximum time is 85uS
-      uint16_t t_ren : 500; //the maximum ammount of time an IO-link device can take to configure itself for communicaion (500uS)
-      uint8_t n_wu : 2; //the maximum number of retries to establish communication
-      uint8_t t_dwu :  50; //wake-up retry delay, max is 50ms min is 30ms (measured in ms).
-      uint8_t t_sd : 1; //Time between two wake up requests, max is 1S minimum time is 500ms.
-      uint8_t t_dmt : 37; //Master message delay time, max is 37 and min is 27 (measured in Tbit).
-      uint8_t t_dsio : 300; //Standard IO Delay, min 60, max 300 (measured in ms)
-      union speeds_t
+      uint8_t t_wu : 80;    // the wake up request pulse time, minimum time is 75uS, maximum time is 85uS
+      uint16_t t_ren : 500; // the maximum ammount of time an IO-link device can take to configure itself for communicaion (500uS)
+      uint8_t n_wu : 2;     // the maximum number of retries to establish communication
+      uint8_t t_dwu : 50;   // wake-up retry delay, max is 50ms min is 30ms (measured in ms).
+      uint8_t t_sd : 1;     // Time between two wake up requests, max is 1S minimum time is 500ms.
+      uint8_t t_dmt : 37;   // Master message delay time, max is 37 and min is 27 (measured in Tbit).
+      uint8_t t_dsio : 300; // Standard IO Delay, min 60, max 300 (measured in ms)
+      struct speeds_t
       {
-        uint32_t com1 = 4800;
-        uint32_t com2 = 38400;
-        uint32_t com3 = 230400;
-      }speeds;
-    }wake;
+        uint32_t com1 : 4800;
+        uint32_t com2 : 38400;
+        uint32_t com3 : 230400;
+      } speeds;
+    } wake;
 
+    // TODO: should I be passing PHY comm through and create comm pins in a inherited item or redefine the structure of pins_t in sequential classes?
+    typedef struct
+    {
+      // PHY_comm_t comm;
+      uint16_t wake_pin;
+      uint16_t EN_pin;
+      uint16_t Fault_pin;
+    } pins_t;
 
-    baud_t getBaud(){
+    SIOComm()
+    {
+      pinInit();
+      enable();
+    };
+    ~SIOComm();
+
+    baud_t getBaud()
+    {
       return baud;
     };
-    void setBaud(baud_t _baud){
+    void setBaud(baud_t _baud)
+    {
       baud = _baud;
     };
-
-    uint32_t rateEnumtoComm(baud_t _baud)
+    uint32_t rateEnumtoComm(baud_t b)
     {
-      uint32_t _rate = 0;
-      switch (_baud)
+      uint32_t r = 0;
+      switch (b)
       {
-        case NOT_DETECTED:
+      case NOT_DETECTED:
         break;
-        case COM1:
-        _rate = wake.speeds.com1;
+      case COM1:
+        r = wake.speeds.com1;
         break;
-        case COM2:
-        _rate = wake.speeds.com2;
+      case COM2:
+        r = wake.speeds.com2;
         break;
-        case COM3:
-        _rate = wake.speeds.com3;
+      case COM3:
+        r = wake.speeds.com3;
         break;
-        default:
+      default:
         break;
       }
-      return _rate;
+      return r;
     }
 
     /// @brief Allowable Data Rates for communication of IO-link devices
     /// The master sends multiple messages at the COM3, COM2, and COM1 data rates (fastest to slowest)
     /// and waits for the device to respond after each send to determine the devices comm speed (baud).
-    uint32_t getRate(baud_t _baud){
-      return rateEnumtoComm(_baud);
+    uint32_t getRate(baud_t b)
+    {
+      return rateEnumtoComm(b);
     }
 
     uint32_t getRate()
@@ -131,26 +169,30 @@ namespace IOlink
       return rate;
     }
 
-    void setRate(uint32_t _rate){
-      rate = _rate;
+    void setRate(uint32_t r)
+    {
+      rate = r;
     }
 
-    void setRate(baud_t _baud){
-      rate = rateEnumtoComm(_baud);
+    void setRate(baud_t b)
+    {
+      rate = rateEnumtoComm(b);
     }
 
-    uint32_t getBitRate(){
+    uint32_t getBitRate()
+    {
       return bitRate;
     }
 
-    void setBitRate(baud_t _baud)
+    void setBitRate(baud_t b)
     {
-      uint32_t _rate = rateEnumtoComm(_baud);
-      setBitRate(_rate);
+      uint32_t r = rateEnumtoComm(b);
+      setBitRate(r);
     }
 
-    void setBitRate(uint32_t _bitRate){
-      bitRate = _bitRate;
+    void setBitRate(uint32_t br)
+    {
+      bitRate = br;
     }
 
     uint8_t getDelayTime()
@@ -158,163 +200,90 @@ namespace IOlink
       return t_dmt_s;
     }
 
-    void setDelayTime(uint8_t _t_dmt_s){
-      t_dmt_s = _t_dmt_s;
+    void setDelayTime(uint8_t t)
+    {
+      t_dmt_s = t;
     }
 
-    void setRates(baud_t _baud)
+    void setRates(baud_t b)
     {
-      setBaud(_baud);
-      uint32_t _rate = rateEnumtoComm(_baud);
-      if(0 != _rate)
+      setBaud(b);
+      uint32_t r = rateEnumtoComm(b);
+      try
       {
-        setRate(_rate);
-        setBitRate((uint8_t)(1000000/_rate));
-        setDelayTime((uint8_t)(1000000*wake.t_dmt/_rate));
+        if (r == 0)
+          throw -1;
+        setRate(r);
+        setBitRate((uint8_t)(1000000 / r));
+        setDelayTime((uint8_t)(1000000 * wake.t_dmt / r));
+      }
+      catch (int x)
+      {
       }
     }
-   
-    
-    wake_parameters_t getWakeParameters(){
+
+    wake_parameters_t getWakeParameters()
+    {
       return wake;
     };
-  };
 
-  class UARTDevice : public SIOComm
-  {
-    
-    protected:
-    //Hard coded some ESP32S3 pins for testing
-    //TODO: make this logic more sophisticated to configure pins dynamically based on some parameters
-    uint8_t RX_pin = 44;
-    uint8_t TX_pin = 43;
-    uint8_t wake_pin = 36;
-    uint8_t EN_pin = 37;
-    uint8_t Fault_pin = 38;
-    bool pin_init = false;
-    bool Enable = false;
-    uint32_t lastWake;
-    uint32_t last_WUR;
-    
-    public:
-    UARTDevice(){
-      pinInit();
-      enable();
-      establishComm();
-    };
-    ~UARTDevice(){};
+    pins_t getPins()
+    {
+      return pins;
+    }
 
-    uint8_t getRXPin()
+    void setPins(pins_t p)
     {
-      return RX_pin;
-    };
-    void setRXPin(uint8_t _RX_pin)
-    {
-      RX_pin = _RX_pin;
-    };
-
-    uint8_t getTXPin()
-    {
-      return TX_pin;
-    };
-    void setTXPin(uint8_t _TX_pin)
-    {
-      TX_pin = _TX_pin;
-    };
-    uint8_t getWakePin()
-    {
-      return wake_pin;
-    };
-    void setWakePin(uint8_t _wake_pin){
-      wake_pin = _wake_pin;
-    };
-
-    uint8_t getENPin()
-    {
-      return EN_pin;
-    };
-    void setENPin(uint8_t _EN_pin)
-    {
-      EN_pin = _EN_pin;
-    };
-
-    /// @brief Method to get Ports pin numer
-    /// @return port pin number
-    uint8_t getFaultPin();
-    /// @brief Configure the fault pin
-    /// @param pin pass through the number of the pin to configure it as the fault pin
-    void setFaultPin(uint8_t pin);
+      pins = p;
+    }
 
     bool wakeUpRequest()
     {
       bool wakeSuccess = false;
-      if(millis()-lastWake > wake.t_dwu)
+      if (millis() - lastWake > wake.t_dwu)
       {
-        digitalWrite(getWakePin() , HIGH);
+        digitalWrite(this->pins.wake_pin, HIGH);
         delayMicroseconds(this->wake.t_wu);
-        digitalWrite(getWakePin(), LOW);
+        digitalWrite(this->pins.wake_pin, LOW);
         delayMicroseconds(this->wake.t_wu);
         lastWake = millis();
         wakeSuccess = true;
       }
       return wakeSuccess;
     };
-    void pinInit()
-    {
-      if(pin_init)
-      {
-        pinMode(getENPin(), OUTPUT);
-        pinMode(getENPin(), LOW);
-        pinMode(getWakePin(), OUTPUT);
-        digitalWrite(getWakePin(), LOW);
-        pinMode(getFaultPin(), INPUT);
-        pin_init = true;
-      }
-    };
+
+    virtual void pinInit();
+    virtual bool testBaud(baud_t b);
+
     void enable()
     {
-      if(Enable){
-        digitalWrite(getENPin(), HIGH);
+      if (Enable)
+      {
+        digitalWrite(pins.EN_pin, HIGH);
         Enable = true;
       }
     };
     void disable()
     {
-      if(!Enable){
-        digitalWrite(getENPin(), LOW);
+      if (!Enable)
+      {
+        digitalWrite(pins.EN_pin, LOW);
         Enable = false;
       }
     };
-
-    /// @brief Method to test a specific ports comm rate
-    /// @param rate pass through a transmission rate
-    /// @return true if the tested com rate is true for the device
-    bool testBaud(baud_t _baud){
-      //set the rates of relevant timing and speed variables based on speed
-      setRates(this._baud);
-      //UART Frames have an 8 bit even parity
-      Serial.begin(rate, SERIAL_8E1, RX_pin, TX_pin);
-
-      size_t sentBytes = Serial.write(0b11111111);
-      unsigned long now = micros();
-      bool timeout = false;
-      while(bytesReceived < 1){
-        bytesReceived += Serial.read(dataReceived, 1);
-        if (micros() - now > t_dmt_s) {
-          timeout = true;
-          break;
-        }
-      }
-      return !timeout;
-    };
-
-    baud_t getComSpeed(){
+    baud_t getComSpeed()
+    {
       baud_t testing_baud = NOT_DETECTED;
-      if(testBaud(COM3)){
+      if (testBaud(COM3))
+      {
         testing_baud = COM3;
-      }else if(testBaud(COM2)){
+      }
+      else if (testBaud(COM2))
+      {
         testing_baud = COM2;
-      }else if(testBaud(COM1)){
+      }
+      else if (testBaud(COM1))
+      {
         testing_baud = COM1;
       }
       return testing_baud;
@@ -326,77 +295,165 @@ namespace IOlink
       uint8_t wake_attempts = 0;
       last_WUR = millis();
 
-      if(millis() - last_WUR > wake.t_sd)
+      if (millis() - last_WUR > wake.t_sd)
       {
-        while(comm_speed == NOT_DETECTED && wake_attempts <= wake.n_wu){
-          if(wakeUpRequest())
+        while (comm_speed == NOT_DETECTED && wake_attempts <= wake.n_wu)
+        {
+          if (wakeUpRequest())
           {
             comm_speed = getComSpeed();
             wake_attempts++;
           }
         }
-        if(comm_speed != NOT_DETECTED){
+        if (comm_speed != NOT_DETECTED)
+        {
           return true;
-        } else {
+        }
+        else
+        {
           return false;
         }
-      }else{
+      }
+      else
+      {
         return false;
       }
-      
     }
 
-    /// @brief An initial configuration of the IO link PHY and the device via the UART port within the function the enable pin is driven high,
-    /// the wake pulse is sent and the appropriate timeout is waited
-    /// com3 is tested first, then com2 and finally com1 to set the transmission speed
-    /// @param UART_RX_pin RX pin
-    /// @param UART_TX_pin TX pin
-    /// @return 
-    //bool configureUARTPort(uint8_t UART_RX_pin,uint8_t UART_TX_pin);
-    
+  protected:
+    pins_t pins = {
+      wake_pin : 36;
+    EN_pin : 37;
+    Fault_pin : 38;
   };
+  bool pin_init = false;
+  bool Enable = false;
+  uint32_t lastWake;
+  uint32_t last_WUR;
 
-  //TODO: Should be able to inherit mutliple PHY interface types
-  class IODeviceComm : public UARTDevice
+  state_t state = IDLE;
+  baud_t baud = NOT_DETECTED;       // baud rate as an enum
+  uint32_t rate = wake.speeds.com3; // the baud rate of comm
+  uint8_t bitRate = 0;              // the bitrate of comm in uS
+  uint8_t t_dmt_s = 0;              // Actual time of delay
+};
+
+class UARTSIO : public SIOComm
+{
+public:
+  UARTSIO()
   {
-    public:
-    IODeviceComm(){};
-    ~IODeviceComm(){};
+    establishComm();
+  };
+  ~UARTSIO(){};
 
-    
-
-    private:
-
-    /// @brief M Sequence control
-    /// @details M-Sequence Control octets are constructed from a packet consisting of:
-    /// Bit 7: R/W bit
-    /// Bit 6-5: Communication Channel
-    /// Bit 0-4:  Address
-    /// All the multi-octet data types shall be transmitted as a big-endian sequence, i.e. the most significant octet (MSO)
-    struct m_sequence
-    {
-        //R/W bit
-        enum r_w_t
-        {
-        write,
-        read
-        };
-
-        //Communication Channel
-        enum comm_channel_t
-        {
-        process,
-        page,
-        diagnosis,
-        ISDU
-        };
-
-        //Address
-        // Other 5 bits
-
-    };
+  uint8_t getRXPin()
+  {
+    return RX_pin;
+  };
+  void setRXPin(uint8_t RX)
+  {
+    RX_pin = RX;
   };
 
+  uint8_t getTXPin()
+  {
+    return TX_pin;
+  };
+  void setTXPin(uint8_t TX)
+  {
+    TX_pin = TX;
+  };
+
+  void pinInit()
+  {
+    if (pin_init)
+    {
+      pinMode(pins.EN_pin, OUTPUT);
+      pinMode(pins.EN_pin, LOW);
+      pinMode(pins.wake_pin, OUTPUT);
+      digitalWrite(pins.wake_pin, LOW);
+      pinMode(pins.Fault_pin, INPUT);
+      Serial.begin(rate, SERIAL_8E1, RX_pin, TX_pin);
+      pin_init = true;
+    }
+  };
+
+  /// @brief Method to test a specific ports comm rate
+  /// @param rate pass through a transmission rate
+  /// @return true if the tested com rate is true for the device
+  bool testBaud(baud_t b)
+  {
+    // set the rates of relevant timing and speed variables based on speed
+    setRates(b);
+    // UART Frames have an 8 bit even parity
+    if (Serial.baudRate() != rate)
+    {
+      // Serial.begin(rate, SERIAL_8E1, RX_pin, TX_pin);
+      Serial.updateBaudRate(rate);
+    }
+
+    Serial.flush();
+
+    uint8_t dataReceived, bytesReceived;
+
+    size_t sentBytes = Serial.write(0b11111111);
+    unsigned long now = micros();
+    bool timeout = false;
+    Serial.available();
+    while (bytesReceived < 1)
+    {
+      bytesReceived += Serial.read(dataReceived);
+      if (micros() - now > t_dmt_s)
+      {
+        timeout = true;
+        break;
+      }
+    }
+    return !timeout;
+  };
+
+protected:
+  uint8_t RX_pin = 44;
+  uint8_t TX_pin = 43;
+};
+
+// TODO: Should be able to inherit mutliple PHY interface types
+class IODeviceComm
+{
+public:
+  IODeviceComm(){};
+  ~IODeviceComm(){};
+
+private:
+  /// @brief M Sequence control
+  /// @details M-Sequence Control octets are constructed from a packet consisting of:
+  /// Bit 7: R/W bit
+  /// Bit 6-5: Communication Channel
+  /// Bit 0-4:  Address
+  /// All the multi-octet data types shall be transmitted as a big-endian sequence, i.e. the most significant octet (MSO)
+  struct m_sequence
+  {
+    // R/W bit
+    enum r_w_t
+    {
+      write,
+      read
+    };
+
+    // Communication Channel
+    enum comm_channel_t
+    {
+      process,
+      page,
+      diagnosis,
+      ISDU
+    };
+
+    // Address
+    //  Other 5 bits
+  };
+};
 }
 
 #endif
