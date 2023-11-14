@@ -1,0 +1,10 @@
+name: Library Lint
+
+on: [push]
+
+jobs:
+  lint:
+    runs-on: ubuntu-22.04
+    steps:
+      - uses: actions/checkout@v3
+      - uses: arduino/arduino-lint-action@v1
