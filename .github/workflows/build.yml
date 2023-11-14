@@ -10,6 +10,7 @@ jobs:
     strategy:
       matrix:
         arduino-platform: ["esp32:esp32"]
+        sketches: ["TIOL11X_master"]
         # This is usually optional but we need to statically define the
         # FQBN of the boards we want to test for each platform. In the
         # future the CLI might automatically detect and download the core
@@ -52,4 +53,4 @@ jobs:
       - name: Compile Sketch
         run: |
           arduino-cli lib list
-          arduino-cli compile --fqbn ${{ matrix.fqbn }} ./examples/TIOL11X_master
+          arduino-cli compile --fqbn ${{ matrix.fqbn }} ./examples/${{ matrix.sketches }}
