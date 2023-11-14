@@ -12,7 +12,7 @@
 
 #include <lwIOlinkMaster.h>
 
-IOLink::Master master;
+IOlink::Master master;
 
 void setup(void)
 {
