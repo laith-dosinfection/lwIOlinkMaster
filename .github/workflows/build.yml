@@ -52,4 +52,4 @@ jobs:
       - name: Compile Sketch
         run: |
           arduino-cli lib list
-          arduino-cli compile --fqbn ${{ matrix.fqbn }} ./examples/TIOL11X_Master
+          arduino-cli compile --fqbn ${{ matrix.fqbn }} ./examples/TIOL11X_master
