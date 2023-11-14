@@ -42,7 +42,7 @@ jobs:
           arduino-cli config set board_manager.additional_urls "${ESP32_BOARD_URL}"
           arduino-cli core install ${{ matrix.arduino-platform }}
           
-      # Install lwIOLink as an Arduino library
+      # Install lwIOlinkMaster as an Arduino library
       - name: Install library
         run: |
           sudo mkdir -p $ARDUINO_LIB_PATH
