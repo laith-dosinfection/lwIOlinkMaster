@@ -10,15 +10,13 @@
 
 #endif
 
-#include "lwIOlinkMaster.h"
-
-IOlink::UARTSIO port1;
+#include <lwIOlinkMaster.h>
 
 void setup(void)
 {
-  //master.begin();
+  master.begin();
 }
 
 void loop(){
-  //master.update();
+  master.update();
 }
