@@ -12,6 +12,8 @@
 
 #include <lwIOlinkMaster.h>
 
+IOLink::Master master;
+
 void setup(void)
 {
   master.begin();
