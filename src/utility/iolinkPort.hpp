@@ -329,7 +329,7 @@ namespace IOlink
 
     state_t state = IDLE;
     baud_t baud = NOT_DETECTED;       // baud rate as an enum
-    uint32_t rate = speeds.com3; // the baud rate of comm
+    uint32_t rate = speeds.com3;      // the baud rate of comm
     uint8_t bitRate = 0;              // the bitrate of comm in uS
     uint8_t t_dmt_s = 0;              // Actual time of delay
   private:
