@@ -24,20 +24,24 @@ namespace IOlink
             SPI
         } PHY_comm_t;
         
-        //typedef std::vector<Port>;
-
-        Master(){};
-        ~Master(){};
+        template<typename T>
+        T* createPort() {
+            T* portObj = new T(this); // Create a new instance of the port class
+            ports.push_back(portObj); // Store the pointer in a collection
+            return portObj;
+        }
 
         void begin(){
             for (int i = 0; i < num_ports; i++)
             {
-                //Port *p[i] = new Port();
+                this->createPort();
             }
         };
 
         void update(){
-
+            for (auto& portObj : ports) {
+                portObj->update();
+            }
         };
 
         int8_t getNumPorts()
@@ -60,6 +64,7 @@ namespace IOlink
     protected:
         int8_t num_ports = 1;
         PHY_comm_t interface = UART;
+        std::vector<class Port*> ports;
     };
 };
 
