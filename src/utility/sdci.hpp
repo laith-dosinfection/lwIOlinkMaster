@@ -1,109 +1,218 @@
-#include "uartPHY.hpp"
+#ifdef ARDUINO_ARCH_ESP32
+#include "driver/uart.h"
+#include "soc/uart_reg.h"
+#endif	//ARDUINO_ARCH_ESP32
 
 
 namespace IOlink
 {
     class SDCIPort
     {
-    public:
-    typedef enum
-    {
-      NOT_DETECTED,
-      COM1,
-      COM2,
-      COM3
-    } baud_t;
     
+    /// @brief Structure for the various PHY SDCI chips
+    struct PHY_t
+    {
+        //Type of Protocols for the various PHY chips
+        enum PHY_Comm_t
+        {
+            UART,
+            SPI,
+            I2C
+        };
+        PHY_Comm_t comm;
+
+        /// @brief PHY EN Pin, allow definition of no EN pin, direct pin or from a gpio expander
+        enum PHY_EN_t
+        {
+            NONE,
+            BUILTIN
+        };
+        PHY_EN_t en;
+
+        /// @brief Fault pin definition
+        enum Fault_t
+        {
+            NONE,//No Used Fault pin
+            BUILTIN_LOGIC_LOW,//Fault is logic level low (0 is considered a fault)
+            BUILTIN_LOGIC_HIGH //Fault is logic level high
+        };
+        Fault_t fault;
+
+        int8_t numSDCIPorts;//I am not 100% sure how I want to handle ICs which have more than 1 IO-link ports
+    };
+
+    /// @brief IO-link Baud Rates
+    enum BaudRate: uint32_t
+    {
+        COM1 = 4800,
+        COM2 = 38400,
+        COM3 = 230400,
+        NOT_DETECTED = 0
+    };
+
     /// @brief Wake-Up paremeters are IO link master stack constants for establishing communication
     /// with an IO link slave device for a given IO link master port
-    typedef struct 
+    enum WakeParameters: uint16_t
     {
-      const uint16_t t_wu;    // the wake up request pulse time, minimum time is 75uS, maximum time is 85uS
-      const uint16_t t_ren; // the maximum ammount of time an IO-link device can take to configure itself for communicaion (500uS)
-      const uint8_t n_wu;     // the maximum number of retries to establish communication
-      const uint16_t t_dwu;   // wake-up retry delay, max is 50ms min is 30ms (measured in ms).
-      const uint8_t t_sd;     // Time between two wake up requests, max is 1S minimum time is 500ms.
-      const uint16_t t_dmt;   // Master message delay time, max is 37 and min is 27 (measured in Tbit).
-      const uint16_t t_dsio; // Standard IO Delay, min 60, max 300 (measured in ms)
-    } wake_parameters_t;
-
-    typedef struct
+        t_wu = 80, // the wake up request pulse time, minimum time is 75uS, maximum time is 85uS
+        t_ren = 500, // the maximum ammount of time an IO-link device can take to configure itself for communicaion (500uS)
+        n_wu = 2, // the maximum number of retries to establish communication
+        t_dwu = 50, // wake-up retry delay, max is 50ms min is 30ms (measured in ms).
+        t_sd = 1, // Time between two wake up requests, max is 1S minimum time is 500ms.
+        t_dmt = 37, // Master message delay time, max is 37 and min is 27 (measured in Tbit).
+        t_dsio = 300 // Standard IO Delay, min 60, max 300 (measured in ms)
+    };
+    
+    /// @brief structure to define the relevant pins of an io link port
+    struct HWConfig// : public PhyDriver::Hw_cfg_t 
     {
-      uint32_t com1;
-      uint32_t com2;
-      uint32_t com3;
-    } speeds_t;
+        Stream &serialPtr;
+        struct PHY_Pin_t
+        {
+            unsigned EN;    //The pin number of the enable pin
+            unsigned Fault; //The pin number of the fault pin
+            unsigned Tx;	//TX pin #
+            unsigned Rx;    //RX pin #
+        };
+        PHY_Pin_t PHY_Pins;
+        struct Power_Pin_t
+        {
+            unsigned EN;
+            unsigned IMON;
+        };
+        Power_Pin_t Power_Pins; 
+    };
 
+    bool PHYEnable;
+    bool PowerEnable;
+    uint16_t current;
 
+    public:
+    
     SDCIPort()
     {
+      begin();
+      establishComm();
       enable();
+      initComm();
     };
     ~SDCIPort(){};
 
-    baud_t getBaud()
-    {
-      return baud;
+    void begin(){
+        switch (master->getCfg().SDCI)
+        {
+        case SDCI_t::TIOL11X:
+            setPHY((PHY_t) {.comm = PHY_Comm_t::UART, .en = PHY_EN_t::BUILTIN, .fault = PHY_Fault_t::BUILTIN_LOGIC_LOW, .numSDCIPorts = 1});
+            TIOL11X_init(this->getPortNum());
+            break;
+        default:
+            break;
+        };
+        pinInit();
     };
-    void setBaud(baud_t _baud)
-    {
-      baud = _baud;
+
+    void TIOL11X_init(uint8_t _port_num){
+        //Some hardcoded pin mappings for the dev board
+        if(_port_num == 1){
+            setConfig((HWConfig) {.serialPtr = Serial, .PHY_Pins={.EN = 42, .Fault = 41, .Rx = 44, .Tx = 43}, .Power_Pins={.EN = 2, .IMON = 1}});
+        } else if (_port_num == 2){
+            setConfig((HWConfig) {.serialPtr = Serial1, .PHY_Pins={.EN = 21, .Fault = 22, .Rx = 18, .Tx = 17}, .Power_Pins={.EN = 20, .IMON = 19}});
+        }
     };
-    uint32_t rateEnumtoComm(baud_t b)
+
+    /// @brief Set the parameters of the PHY port
+    void setPHY(PHY_t _PHY){
+        PHY = _PHY;
+    };
+
+    PHY_t getPHY(){
+        return PHY;
+    };
+
+    /// @brief setting the config of the SDCI port
+    void setConfig(HWConfig _config){
+        config = _config;
+    };
+
+    HWConfig getConfig(){
+        return config;
+    };
+
+    /// @brief Do some stuff to handle fault events
+    void phyFault(){
+
+    };
+
+    void pinInit()
     {
-      uint32_t r = 0;
-      switch (b)
-      {
-      case NOT_DETECTED:
-        break;
-      case COM1:
-        r = speeds.com1;
-        break;
-      case COM2:
-        r = speeds.com2;
-        break;
-      case COM3:
-        r = speeds.com3;
-        break;
-      default:
-        break;
-      }
-      return r;
-    }
+        if (pin_init)
+        {
+            switch ((PHY_EN_t)this->PHY.en)
+            {
+            case BUILTIN_LOGIC_LOW:
+                pinMode(config.PHY_Pins.EN, OUTPUT);
+                pinMode(config.PHY_Pins.EN, LOW);
+                break;
+            default:
+                break;
+            };
+
+            switch ((Fault_t)this->PHY.fault)
+            {
+            case BUILTIN_LOGIC_LOW:
+                pinMode(config.PHY_Pins.Fault, INPUT);
+                //Playing around with the idea of tying to an interrupt, might just check pin level periodically instead.
+                attachInterrupt(digitalPinToInterrupt(config.PHY_Pins.Fault), phyFault, FALLING);
+                break;
+            default:
+                break;
+            };
+            
+            //I don't know if you are allowed to do this?  Just trying to abrstract the serial port
+            static_cast<HardwareSerial*>(SerialPort)->begin(static_cast<uint32_t> (Baud), SERIAL_8E1, config.PHY_Pins.Rx, config.PHY_Pins.Tx);
+            pin_init = true;
+        }
+    };
+
+    void initComm(){
+        determineDeviceBaud();
+    };
+
+    BaudRate determineDeviceBaud(){
+        wakeUpRequest();
+    };
+
+    void Update(){
+        
+    };
+
+    BaudRate getBaud()
+    {
+      return Baud;
+    };
+    void setBaud(BaudRate _Baud)
+    {
+      Baud = _Baud;
+    };
 
     /// @brief Allowable Data Rates for communication of IO-link devices
     /// The master sends multiple messages at the COM3, COM2, and COM1 data rates (fastest to slowest)
     /// and waits for the device to respond after each send to determine the devices comm speed (baud).
-    uint32_t getRate(baud_t b)
-    {
-      return rateEnumtoComm(b);
-    }
-
     uint32_t getRate()
     {
-      return rate;
-    }
-
-    void setRate(uint32_t r)
-    {
-      rate = r;
-    }
-
-    void setRate(baud_t b)
-    {
-      rate = rateEnumtoComm(b);
-    }
+      return (uint32_t)this->Baud;
+    };
 
     uint32_t getBitRate()
     {
       return bitRate;
-    }
+    };
 
     void setBitRate(baud_t b)
     {
       uint32_t r = rateEnumtoComm(b);
       setBitRate(r);
-    }
+    };
 
     void setBitRate(uint32_t br)
     {
@@ -136,77 +245,88 @@ namespace IOlink
       }
     }
 
-    pins_t getPins()
+    HWConfig getConfig()
     {
-      return pins;
+      return config;
     }
 
-    void setPins(pins_t p)
+    void setConfig(HWConfig cfg)
     {
-      pins = p;
+      config = cfg;
     }
 
     bool wakeUpRequest()
     {
       bool wakeSuccess = false;
-      if (millis() - lastWake > wake.t_dwu)
+      if (millis() - lastWake > WakeParameters::t_dwu)
       {
-        digitalWrite(this->pins.wake_pin, HIGH);
-        delayMicroseconds(wake.t_wu);
-        digitalWrite(this->pins.wake_pin, LOW);
-        delayMicroseconds(wake.t_wu);
+        digitalWrite(config.PHY_pins.TX , HIGH);
+        delayMiroseconds(WakeParameters::t_wu);
+        digitalWrite(config.PHY_pins.TX, LOW);
+        delayMicroseconds(WakeParameters::t_wu);
         lastWake = millis();
         wakeSuccess = true;
       }
       return wakeSuccess;
     };
 
-    virtual void pinInit() = 0;
     virtual bool testBaud(baud_t b) = 0;
 
-    void enable()
-    {
-      if (Enable)
-      {
-        digitalWrite(pins.EN_pin, HIGH);
-        Enable = true;
-      }
-    };
-    void disable()
-    {
-      if (!Enable)
-      {
-        digitalWrite(pins.EN_pin, LOW);
-        Enable = false;
-      }
-    };
-    baud_t getComSpeed()
-    {
-      baud_t testing_baud = NOT_DETECTED;
-      if (testBaud(COM3))
-      {
-        testing_baud = COM3;
-      }
-      else if (testBaud(COM2))
-      {
-        testing_baud = COM2;
-      }
-      else if (testBaud(COM1))
-      {
-        testing_baud = COM1;
-      }
-      return testing_baud;
+    /// @brief Enable both PHY IC and PWR
+    void enable(){
+        enablePHY();
+        enablePWR();
     }
+
+    /// @brief Drive the enable pin for the PHY chip High
+    void enablePHY()
+    {
+      if (PHYEnable)
+      {
+        digitalWrite(config.PHY_pins.EN, HIGH);
+        PHYEnable = true;
+      }
+    };
+
+    /// @brief Drive the enable pin for the PHY chip Low
+    void disablePHY()
+    {
+      if (!PHYEnable)
+      {
+        digitalWrite(config.PHY_pins.EN, LOW);
+        PHYEnable = false;
+      }
+    };
+
+    /// @brief Drive enable pin for smart side switch high
+    void enablePWR()
+    {
+      if (PowerEnable)
+      {
+        digitalWrite(config.Power_Pins.EN, HIGH);
+        PowerEnable = true;
+      }
+    };
+
+    /// @brief Drive the enable pin for the smart side switch Low
+    void disablePWR()
+    {
+      if (!PowerEnable)
+      {
+        digitalWrite(config.Power_Pins.EN, LOW);
+        PowerEnable = false;
+      }
+    };
+
 
     bool establishComm()
     {
-      baud_t comm_speed;
       uint8_t wake_attempts = 0;
       last_WUR = millis();
 
       if (millis() - last_WUR > wake.t_sd)
       {
-        while (comm_speed == NOT_DETECTED && wake_attempts <= wake.n_wu)
+        while (Baud == NOT_DETECTED && wake_attempts <= wake.n_wu)
         {
           if (wakeUpRequest())
           {
@@ -230,19 +350,17 @@ namespace IOlink
     }
 
     protected:
-        pins_t pins = {36, 37, 38};
+        PHY_t PHY;
+        HWConfig config;
         bool pin_init = false;
-        bool Enable = false;
+        bool PHYEnable = false;
+        bool PowerEnable = false;
         uint32_t lastWake;
         uint32_t last_WUR;
 
         //state_t state = IDLE;
-        baud_t baud = NOT_DETECTED;       // baud rate as an enum
-        uint32_t rate = speeds.com3;      // the baud rate of comm
+        BaudRate Baud = NOT_DETECTED;			// baud rate for transmission
         uint8_t bitRate = 0;              // the bitrate of comm in uS
         uint8_t t_dmt_s = 0;              // Actual time of delay
-    private:
-        wake_parameters_t wake = {80,500,2,50,1,37,300};
-        speeds_t speeds = {4800,38400,230400};
     };  
 }

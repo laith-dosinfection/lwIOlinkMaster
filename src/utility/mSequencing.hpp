@@ -3,6 +3,30 @@
 
 namespace IOlink
 {
+    uint8_t Device::GetChecksum(const uint8_t *data,
+                            uint8_t length) const
+    {
+        uint8_t ck8 = ck8_seed;
+        for (uint8_t i = 0; i < length; i++)
+        {
+            ck8 ^= *data++;
+        }
+        //Section A.1.6
+        const uint8_t bit5 = ((ck8 >> 7) & 1U) ^ ((ck8 >> 5) & 1U) ^ ((ck8 >> 3) & 1U) ^ ((ck8 >> 1) & 1U);
+        const uint8_t bit4 = ((ck8 >> 6) & 1U) ^ ((ck8 >> 4) & 1U) ^ ((ck8 >> 2) & 1U) ^ (ck8 & 1U);
+        const uint8_t bit3 = ((ck8 >> 7) & 1U) ^ ((ck8 >> 6) & 1U);
+        const uint8_t bit2 = ((ck8 >> 5) & 1U) ^ ((ck8 >> 4) & 1U);
+        const uint8_t bit1 = ((ck8 >> 3) & 1U) ^ ((ck8 >> 2) & 1U);
+        const uint8_t bit0 = ((ck8 >> 1) & 1U) ^ ((ck8 & 1U));
+        const uint8_t ck6 =     bit5 << 5 |
+                                bit4 << 4 |
+                                bit3 << 3 |
+                                bit2 << 2 |
+                                bit1 << 1 |
+                                bit0;
+        return ck6;
+    }
+    
     class IODeviceComm
     {
     public:

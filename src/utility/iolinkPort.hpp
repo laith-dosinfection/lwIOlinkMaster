@@ -27,19 +27,21 @@ namespace IOlink
   class Port
   {
   public:
-    typedef enum
+    enum mode_t
     {
       DEACTIVATED,
       IOL_MANUAL,
       IOL_AUTOSTART,
       DI_CQ,
       DO_CQ
-    } mode_t;
+    };
 
     Port(Master* master) : master(master) {
+
       sdciPort = new SDCIPort();
+      ///TODO: Will need to imlpement SIO Code for Pin 4 on the M12
       //sioPort = new SIOPort();
-      configurePort();
+      begin();
     };
     ~Port() {
       delete sdciPort;
@@ -47,23 +49,31 @@ namespace IOlink
     };
 
 
-    update(){
-        //sioPort->update();
+    void update(){
+      switch (mode)
+      {
+      case IOL_AUTOSTART:
         sdciPort->update();
-    }
+        break;
+      default:
+        break;
+      }
+      //sioPort->update();
+        
+    };
 
     /// @brief need to dynamically configure the port based on its type if generic port gets created will need to destroy the port and create an SIO port or inherit port in SIO port
-    void configurePort(){
+    void begin(){
       switch (mode)
       {
         //Need to implement other case statements and build the functions to back them up
         case IOL_AUTOSTART:
-          sdciPort->
+          sdciPort->begin();
           break;
         default:
           break;
       }
-    }
+    };
 
     /// @brief define the fuction of the port, set it as IO link/DI/DO
     /// @param mode enum of port modes
@@ -87,9 +97,10 @@ namespace IOlink
     uint8_t getPortNum()
     {
       return port_num;
-    }
+    };
 
   protected:
+    //Some Hardcoded variables for testing
     mode_t mode = IOL_AUTOSTART;
     uint8_t port_num = 1;
   private:
