@@ -3,10 +3,12 @@
 #include "soc/uart_reg.h"
 #endif	//ARDUINO_ARCH_ESP32
 
+#include "mSequences.hpp"
+
 
 namespace IOlink
 {
-    class SDCIPort
+    class SDCIPort : public sdciMessages
     {
     
     /// @brief Structure for the various PHY SDCI chips
@@ -41,6 +43,16 @@ namespace IOlink
         int8_t numSDCIPorts;//I am not 100% sure how I want to handle ICs which have more than 1 IO-link ports
     };
 
+    enum messageHandlerState{
+        INACTIVE,
+        IDLE,
+        GET_MESSAGE,
+        CHECK_MESSAGE,
+        CREATE_MESSAGE
+    };
+
+
+
     /// @brief IO-link Baud Rates
     enum BaudRate: uint32_t
     {
@@ -58,7 +70,7 @@ namespace IOlink
         t_ren = 500, // the maximum ammount of time an IO-link device can take to configure itself for communicaion (500uS)
         n_wu = 2, // the maximum number of retries to establish communication
         t_dwu = 50, // wake-up retry delay, max is 50ms min is 30ms (measured in ms).
-        t_sd = 1, // Time between two wake up requests, max is 1S minimum time is 500ms.
+        t_sd = 1000, // Time between two wake up requests, max is 1S minimum time is 500ms.
         t_dmt = 37, // Master message delay time, max is 37 and min is 27 (measured in Tbit).
         t_dsio = 300 // Standard IO Delay, min 60, max 300 (measured in ms)
     };
@@ -89,10 +101,9 @@ namespace IOlink
 
     public:
     
-    SDCIPort()
+    SDCIPort(Port* port) : port(port)
     {
       begin();
-      establishComm();
       enable();
       initComm();
     };
@@ -103,7 +114,7 @@ namespace IOlink
         {
         case SDCI_t::TIOL11X:
             setPHY((PHY_t) {.comm = PHY_Comm_t::UART, .en = PHY_EN_t::BUILTIN, .fault = PHY_Fault_t::BUILTIN_LOGIC_LOW, .numSDCIPorts = 1});
-            TIOL11X_init(this->getPortNum());
+            TIOL11X_init(port->getPortNum());
             break;
         default:
             break;
@@ -114,10 +125,46 @@ namespace IOlink
     void TIOL11X_init(uint8_t _port_num){
         //Some hardcoded pin mappings for the dev board
         if(_port_num == 1){
-            setConfig((HWConfig) {.serialPtr = Serial, .PHY_Pins={.EN = 42, .Fault = 41, .Rx = 44, .Tx = 43}, .Power_Pins={.EN = 2, .IMON = 1}});
+            setConfig((HWConfig) {.serialPtr = &Serial, .PHY_Pins={.EN = 42, .Fault = 41, .Rx = 44, .Tx = 43}, .Power_Pins={.EN = 2, .IMON = 1}});
         } else if (_port_num == 2){
-            setConfig((HWConfig) {.serialPtr = Serial1, .PHY_Pins={.EN = 21, .Fault = 22, .Rx = 18, .Tx = 17}, .Power_Pins={.EN = 20, .IMON = 19}});
+            //setConfig((HWConfig) {.serialPtr = &Serial1, .PHY_Pins={.EN = 21, .Fault = 22, .Rx = 18, .Tx = 17}, .Power_Pins={.EN = 20, .IMON = 19}});
         }
+    };
+
+    /// @brief Method to test a specific ports comm rate
+    /// @param rate pass through a transmission rate
+    /// @return true if the tested com rate is true for the device
+    bool testBaud(BaudRate b)
+    {
+        uint32_t test_baud = (uint32_t) b;
+        if (config.serialPtr->baudRate() != test_baud)
+        {
+            config.serialPtr->updateBaudRate(test_baud);
+        }
+        config.serialPtr->flush();
+
+        /// TODO: Implement the timer functions in the "TaskScheduler" library possibly
+        uint8_t bytesReceived = 0;
+        uint8_t dataSent[2], dataReceived[2];
+        //Need to initially send a 0xA2 as MC
+        dataSent[0] = MC(r_w_t::read, comm_channel_t::page, (uint8_t)Address::MinCycleTime);//{0xA2};
+        dataSent[1] = CKT(m_sequence_type::TYPE0, GetChecksum(*dataSent[0], 1));
+        //size_t sentBytes = Serial.write(dataSent, sizeof(dataSent));
+        size_t sentBytes = config.serialPtr->write(dataSent, sizeof(dataSent));
+        unsigned long now = micros();
+        bool timeout = false;
+        config.serialPtr->available();
+        while (bytesReceived < 2)
+        {
+            ///TODO: Need to put the initial bytesReceived OD & CKS somewhere and process checksum
+            bytesReceived += config.serialPtr->read(dataReceived, 2);
+            if (micros() - now > t_dmt_s)
+            {
+                timeout = true;
+                break;
+            }
+        };
+        return !timeout;
     };
 
     /// @brief Set the parameters of the PHY port
@@ -138,7 +185,7 @@ namespace IOlink
         return config;
     };
 
-    /// @brief Do some stuff to handle fault events
+    /// @brief TODO: Do some stuff to handle fault events
     void phyFault(){
 
     };
@@ -147,7 +194,7 @@ namespace IOlink
     {
         if (pin_init)
         {
-            switch ((PHY_EN_t)this->PHY.en)
+            switch (PHY.en)
             {
             case BUILTIN_LOGIC_LOW:
                 pinMode(config.PHY_Pins.EN, OUTPUT);
@@ -157,7 +204,7 @@ namespace IOlink
                 break;
             };
 
-            switch ((Fault_t)this->PHY.fault)
+            switch (PHY.fault)
             {
             case BUILTIN_LOGIC_LOW:
                 pinMode(config.PHY_Pins.Fault, INPUT);
@@ -169,17 +216,14 @@ namespace IOlink
             };
             
             //I don't know if you are allowed to do this?  Just trying to abrstract the serial port
-            static_cast<HardwareSerial*>(SerialPort)->begin(static_cast<uint32_t> (Baud), SERIAL_8E1, config.PHY_Pins.Rx, config.PHY_Pins.Tx);
+            // UART Frames have an 8 bit even parity
+            static_cast<HardwareSerial*>(serialPtr)->begin(static_cast<uint32_t> (Baud), SERIAL_8E1, config.PHY_Pins.Rx, config.PHY_Pins.Tx);
             pin_init = true;
         }
     };
 
     void initComm(){
-        determineDeviceBaud();
-    };
-
-    BaudRate determineDeviceBaud(){
-        wakeUpRequest();
+        Baud = getDeviceComm();
     };
 
     void Update(){
@@ -200,7 +244,7 @@ namespace IOlink
     /// and waits for the device to respond after each send to determine the devices comm speed (baud).
     uint32_t getRate()
     {
-      return (uint32_t)this->Baud;
+      return (uint32_t)Baud;
     };
 
     uint32_t getBitRate()
@@ -229,16 +273,14 @@ namespace IOlink
       t_dmt_s = t;
     }
 
-    void setRates(baud_t b)
+    void setRates(BaudRate b)
     {
-      setBaud(b);
-      uint32_t r = rateEnumtoComm(b);
       try
       {
         if (r == 0) throw -1;
         setRate(r);
         setBitRate((uint8_t)(1000000 / r));
-        setDelayTime((uint8_t)(1000000 * wake.t_dmt / r));
+        setDelayTime((uint8_t)(1000000 * WakeParameters::t_dmt / r));
       }
       catch (int x)
       {
@@ -260,6 +302,7 @@ namespace IOlink
       bool wakeSuccess = false;
       if (millis() - lastWake > WakeParameters::t_dwu)
       {
+        //Not sure if you can do digital writes to pins after Serial.begin, might have to add a check and pause the serial port and reinit after
         digitalWrite(config.PHY_pins.TX , HIGH);
         delayMiroseconds(WakeParameters::t_wu);
         digitalWrite(config.PHY_pins.TX, LOW);
@@ -270,13 +313,14 @@ namespace IOlink
       return wakeSuccess;
     };
 
-    virtual bool testBaud(baud_t b) = 0;
+    //virtual bool testBaud(baud_t b) = 0;
 
     /// @brief Enable both PHY IC and PWR
     void enable(){
+        //Not sure if order matters, I would assume booting the PHY prior to powering the port would be best practice
         enablePHY();
         enablePWR();
-    }
+    };
 
     /// @brief Drive the enable pin for the PHY chip High
     void enablePHY()
@@ -319,35 +363,33 @@ namespace IOlink
     };
 
 
-    bool establishComm()
+    BaudRate getDeviceComm()
     {
-      uint8_t wake_attempts = 0;
-      last_WUR = millis();
+        uint8_t wake_attempts = 0;
+      
+        //Keep trying to wake until max number of wake calls is exceeded.
+        while (wake_attempts <= (uint16_t)WakeParameters::n_wu)
+        {
+            //Await until t_sd has been exceeded
+            if (millis() - lastWake > (uint16_t)WakeParameters::t_sd)
+            {
+                //Attempt a wake up will only return true if the wake-up retry delay was
+                if (wakeUpRequest())
+                {
+                    for(int i = 0; i < BaudRate.length(); i++){
+                        if(testBaud((BaudRate) i)){
+                            setRates((BaudRate) i);
+                            return (BaudRate) i;
+                        };
+                    }; 
+                    wake_attempts++;
+                };
+            };
+        };
+        return NOT_DETECTED;
+    };
 
-      if (millis() - last_WUR > wake.t_sd)
-      {
-        while (Baud == NOT_DETECTED && wake_attempts <= wake.n_wu)
-        {
-          if (wakeUpRequest())
-          {
-            comm_speed = getComSpeed();
-            wake_attempts++;
-          }
-        }
-        if (comm_speed != NOT_DETECTED)
-        {
-          return true;
-        }
-        else
-        {
-          return false;
-        }
-      }
-      else
-      {
-        return false;
-      }
-    }
+      
 
     protected:
         PHY_t PHY;

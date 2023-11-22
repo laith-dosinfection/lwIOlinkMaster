@@ -4,13 +4,14 @@
 #if __has_include(<driver/uart.h> )
 
 #include <driver/uart.h>
-#include "lwIOlinkMaster.hpp"
+
 
 #endif
 
 #include <Arduino.h>
 #include <cstdint>
 #include <cstddef>
+#include "lwIOlinkMaster.hpp"
 #include "sdci.hpp"
 
 #define DATA_SIZE 1
