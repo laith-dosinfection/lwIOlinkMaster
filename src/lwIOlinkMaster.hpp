@@ -1,7 +1,9 @@
-#ifndef __LW_IO_LINK_MASTER_H__
-#define __LW_IO_LINK_MASTER_H__
+#ifndef __lwIOlinkMaster_HPP__
+#define __lwIOlinkMaster_HPP__
 
+#ifndef __IOlinkPort_HPP__
 #include "utility/iolinkPort.hpp"
+#endif //IOlinkPort
 
 #if __has_include(<sdkconfig.h>)
 #include <sdkconfig.h>
@@ -9,35 +11,66 @@
 
 #include <vector>
 
+//#include <TaskScheduler.h>
+
 /// global instance.
-//IOlink::Master master;
+IOlink::Master master;
 
 namespace IOlink
 {
     class Master
     {
-    public:
-        typedef enum
+    public:        
+        /// @brief Master port IC definitions of the PHY IC used by the schematic
+        enum class SDCI_t
         {
-            UART,
-            I2C,
-            SPI
-        } PHY_comm_t;
+            TIOL11X,
+            UNKNOWN
+        };
+
+        enum class PortSwitch_t
+        {
+            TPS27S100A, //TPS27S100A has a "Fault pin" which is driven low in the case of a fault 
+            TPS27S100B, //TPS27S100B has a Current monitoring pin which outputs a voltage which maps to port current.
+            NONE
+        };
+
+        /// @brief TODO: Future implementation of a SIO pin to be used.
+        enum class SIO_t
+        {
+            NONE
+        };
+
+        struct PortConfig
+        {
+            SDCI_t SDCI;
+            SIO_t SIO;
+            PortSwitch_t Switch;
+        };
         
-        //typedef std::vector<Port>;
+        
+        template<typename T>
+        T* createPort() {
+            T* portObj = new T(this); // Create a new instance of the port class
+            ports.push_back(portObj); // Store the pointer in a collection
+            return portObj;
+        };
 
-        Master(){};
-        ~Master(){};
-
-        void begin(){
+        void begin(PortConfig _cfg){
             for (int i = 0; i < num_ports; i++)
             {
-                //Port *p[i] = new Port();
+                this->createPort();
             }
         };
 
-        void update(){
+        void begin(){
+            begin((PortConfig) {.SDCI = SDCI_t::TIOL11X, .SIO = SIO_t::NONE, .Switch = PortSwitch_t::TPS27S100B});
+        };
 
+        void update(){
+            for (auto& portObj : ports) {
+                portObj->update();
+            }
         };
 
         int8_t getNumPorts()
@@ -49,18 +82,22 @@ namespace IOlink
             num_ports = _num_ports;
         };
 
-        PHY_comm_t getPHYInterface()
-        {
-            return interface;
+      void setCfg(PortConfig _cfg){
+            cfg = _cfg;
         };
-        void setPHYInterface(PHY_comm_t _interface)
-        {
-            interface = _interface;
+
+        PortConfig getCfg(){
+            return cfg;
         };
+
+
     protected:
-        int8_t num_ports = 1;
-        PHY_comm_t interface = UART;
+        ///TODO: Will need to programatically set the max number of ports based on the PHY & the processor's I/O
+        int8_t max_num_ports = 2;
+        int8_t num_ports = 1; //Just going to test with a single port for now.
+        std::vector<class Port*> ports;
+        PortConfig cfg;
     };
 };
 
-#endif
+#endif //lwIOlinkMaster

@@ -1,0 +1,33 @@
+{
+    "name": "lwIOlinkMaster",
+    "version": "0.0.11",
+    "description": "Lightweight IOLink Device library.",
+    "keywords": "communication, IO-link, Master, SMI, SDCI",
+    "repository":
+    {
+      "type": "git",
+      "url": "https://github.com/unref-ptr/lwIOLink.git"
+    },
+    "authors":
+    [
+      {
+        "name": "Laith Charles",
+        "email": "laith@dosinfection.com"
+      },
+      {
+        "name": "unref-ptr",
+        "email": "unref-ptr@protonmail.com",
+        "maintainer": true
+      }
+    ],
+    "license": "GPL-3.0-only",
+    "dependencies": [
+        {
+            "owner": "Anatoli Arkhipenko",
+            "name": "TaskScheduler",
+            "version": "^3.7.0"
+        }
+    ],
+    "frameworks": "arduino",
+    "platforms": "*"
+  }
