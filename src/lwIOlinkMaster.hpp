@@ -1,7 +1,9 @@
-#ifndef __LW_IO_LINK_MASTER_H__
-#define __LW_IO_LINK_MASTER_H__
+#ifndef __lwIOlinkMaster_HPP__
+#define __lwIOlinkMaster_HPP__
 
+#ifndef __IOlinkPort_HPP__
 #include "utility/iolinkPort.hpp"
+#endif //IOlinkPort
 
 #if __has_include(<sdkconfig.h>)
 #include <sdkconfig.h>
@@ -98,4 +100,4 @@ namespace IOlink
     };
 };
 
-#endif
+#endif //lwIOlinkMaster

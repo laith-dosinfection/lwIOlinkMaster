@@ -1,10 +1,14 @@
+#ifndef _sdci_HPP_
+#define _sdci_HPP_
+
 #ifdef ARDUINO_ARCH_ESP32
 #include "driver/uart.h"
 #include "soc/uart_reg.h"
 #endif	//ARDUINO_ARCH_ESP32
 
+#ifndef _mSequences_HPP_
 #include "mSequences.hpp"
-
+#endif //mSequences
 
 namespace IOlink
 {
@@ -406,3 +410,5 @@ namespace IOlink
         uint8_t t_dmt_s = 0;              // Actual time of delay
     };  
 }
+
+#endif //SDCI

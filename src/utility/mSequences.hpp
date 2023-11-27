@@ -1,4 +1,9 @@
+#ifndef _mSequences_HPP_
+#define _mSequences_HPP_
+
+#ifndef _sdci_HPP_
 #include "sdci.hpp"
+#endif //SDCI
 
 namespace IOlink
 {
@@ -107,3 +112,5 @@ namespace IOlink
         };
     };
 }
+
+#endif //mSequences

@@ -1,5 +1,5 @@
-#ifndef __IO_LINK_PORT_H__
-#define __IO_LINK_PORT_H__
+#ifndef __IOlinkPort_HPP__
+#define __IOlinkPort_HPP__
 
 #if __has_include(<driver/uart.h> )
 
@@ -8,11 +8,12 @@
 
 #endif
 
-#include <Arduino.h>
 #include <cstdint>
 #include <cstddef>
-#include "lwIOlinkMaster.hpp"
+
+#ifndef _sdci_HPP_
 #include "sdci.hpp"
+#endif //SDCI
 
 #define DATA_SIZE 1
 
@@ -111,4 +112,4 @@ namespace IOlink
   };
 }
 
-#endif
+#endif //IOlinkPort
