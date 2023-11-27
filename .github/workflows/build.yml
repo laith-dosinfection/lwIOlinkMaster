@@ -1,23 +1,56 @@
 name: Build
 
-on: [push]
+on: [push, pull_request]
 
 jobs:
   build:
-    runs-on: ubuntu-22.04
-    steps:
-      - uses: actions/checkout@v3
-      - uses: actions/cache@v3
-        with:
-          path: |
-            ~/.cache/pip
-            ~/.platformio/.cache
-          key: ${{ runner.os }}-pio
-      - uses: actions/setup-python@v4
-        with:
-          python-version: '3.9'
-      - name: Install PlatformIO Core
-        run: pip install --upgrade platformio
+    env:
+      ARDUINO_LIB_PATH: /home/runner/Arduino/libraries
+      ESP32_BOARD_URL: https://dl.espressif.com/dl/package_esp32_index.json
+    strategy:
+      matrix:
+        arduino-platform: ["esp32:esp32"]
+        sketches: ["TIOL11X_master"]
+        # This is usually optional but we need to statically define the
+        # FQBN of the boards we want to test for each platform. In the
+        # future the CLI might automatically detect and download the core
+        # needed to compile against a certain FQBN, at that point the
+        # following `include` section will be useless.
+        include:
+          # This works like this: when the platform is "arduino:samd", the
+          # variable `fqbn` is set to "arduino:samd:nano_33_iot".
+          - arduino-platform: "esp32:esp32"
+            fqbn: "esp32:esp32:esp32"
 
-      - name: Build PlatformIO Project
-        run: pio run
+    runs-on: ubuntu-22.04
+
+    steps:
+      # Clone the repo
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      # Install Arduino CLI
+      - name: Setup Arduino CLI
+        uses: arduino/setup-arduino-cli@v1
+
+      # Install the Arduino platform
+      # Will be determined dynamically by the build matrix.
+      - name: Install platform
+        run: |
+          arduino-cli core update-index
+          arduino-cli config init
+          arduino-cli config set board_manager.additional_urls "${ESP32_BOARD_URL}"
+          arduino-cli core install ${{ matrix.arduino-platform }}
+          
+      # Install lwIOlinkMaster as an Arduino library
+      - name: Install library
+        run: |
+          sudo mkdir -p $ARDUINO_LIB_PATH
+          sudo cp $GITHUB_WORKSPACE/../lwIOlinkMaster -r $ARDUINO_LIB_PATH
+
+      # Finally, we compile the sketch, using the FQBN that was set
+      # in the build matrix.
+      - name: Compile Sketch
+        run: |
+          arduino-cli lib list
+          arduino-cli compile --fqbn ${{ matrix.fqbn }} ./examples/${{ matrix.sketches }}

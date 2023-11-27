@@ -10,6 +10,7 @@
 #endif
 
 #include <vector>
+
 //#include <TaskScheduler.h>
 
 /// global instance.
@@ -19,8 +20,7 @@ namespace IOlink
 {
     class Master
     {
-    public:
-        
+    public:        
         /// @brief Master port IC definitions of the PHY IC used by the schematic
         enum class SDCI_t
         {
@@ -82,7 +82,7 @@ namespace IOlink
             num_ports = _num_ports;
         };
 
-        void setCfg(PortConfig _cfg){
+      void setCfg(PortConfig _cfg){
             cfg = _cfg;
         };
 

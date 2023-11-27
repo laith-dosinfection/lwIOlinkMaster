@@ -5,7 +5,6 @@
 
 #include <driver/uart.h>
 
-
 #endif
 
 #include <cstdint>
@@ -36,6 +35,7 @@ namespace IOlink
       IOL_AUTOSTART,
       DI_CQ,
       DO_CQ
+
     };
 
     Port(Master* master) : master(master) {
@@ -76,7 +76,6 @@ namespace IOlink
           break;
       }
     };
-
     /// @brief define the fuction of the port, set it as IO link/DI/DO
     /// @param mode enum of port modes
     void setPortMode(mode_t _mode)
