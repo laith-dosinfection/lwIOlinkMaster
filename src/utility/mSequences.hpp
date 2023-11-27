@@ -64,23 +64,27 @@ namespace IOlink
         public:
 
         uint8_t CKS(EventFlag e, PDstatus s, uint8_t _checkSum){
+            uint8_t checkSum = _checkSum;
             uint8_t event = (uint8_t)e << 7;
             uint8_t status = (uint8_t)s << 6;
-            return event || status || _checksum;
+            return event || status || checkSum;
         };
 
         bool CKS(uint8_t _data){
+            uint8_t data = _data;
             bool event = (data & 0b10000000) != 0;
             bool status = (data & 0b01000000) != 0;
             uint8_t checkSum = (data & 0b0011111);
         };
 
         uint8_t CKT(m_sequence_type _type, uint8_t _checkSum){
+            uint8_t checkSum = _checkSum;
             uint8_t type = (uint8_t)_type << 6;
-            return type || _checkSum;
+            return type || checkSum;
         };
 
-        uint8_t MC(r_w_t _rw, comm_channel_t _c, uint8_t data){
+        uint8_t MC(r_w_t _rw, comm_channel_t _c, uint8_t _data){
+            uint8_t data = _data;
             uint8_t rw = (uint8_t)_rw << 7;
             uint8_t c = (uint8_t)_c << 6;
             return rw || c || data;

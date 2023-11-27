@@ -13,7 +13,7 @@
 //#include <TaskScheduler.h>
 
 /// global instance.
-//IOlink::Master master;
+IOlink::Master master;
 
 namespace IOlink
 {
