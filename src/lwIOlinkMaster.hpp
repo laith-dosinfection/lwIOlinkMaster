@@ -22,13 +22,13 @@ namespace IOlink
     public:
         
         /// @brief Master port IC definitions of the PHY IC used by the schematic
-        enum SDCI_t
+        enum class SDCI_t
         {
             TIOL11X,
             UNKNOWN
         };
 
-        enum PortSwitch_t
+        enum class PortSwitch_t
         {
             TPS27S100A, //TPS27S100A has a "Fault pin" which is driven low in the case of a fault 
             TPS27S100B, //TPS27S100B has a Current monitoring pin which outputs a voltage which maps to port current.
@@ -36,7 +36,7 @@ namespace IOlink
         };
 
         /// @brief TODO: Future implementation of a SIO pin to be used.
-        enum SIO_t
+        enum class SIO_t
         {
             NONE
         };
@@ -64,7 +64,7 @@ namespace IOlink
         };
 
         void begin(){
-            begin((PortConfig) {.SDCI = TIOL11X, .SIO = NONE, .Switch = TPS27S100B});
+            begin((PortConfig) {.SDCI = SDCI_t::TIOL11X, .SIO = SIO_t::NONE, .Switch = PortSwitch_t::TPS27S100B});
         };
 
         void update(){

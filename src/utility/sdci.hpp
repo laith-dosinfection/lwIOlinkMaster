@@ -6,6 +6,8 @@
 #include "soc/uart_reg.h"
 #endif	//ARDUINO_ARCH_ESP32
 
+#include "../lwIOlinkMaster.hpp"
+
 #ifndef _mSequences_HPP_
 #include "mSequences.hpp"
 #endif //mSequences
@@ -36,7 +38,7 @@ namespace IOlink
         PHY_EN_t en;
 
         /// @brief Fault pin definition
-        enum Fault_t
+        enum class Fault_t
         {
             NONE,//No Used Fault pin
             BUILTIN_LOGIC_LOW,//Fault is logic level low (0 is considered a fault)
@@ -47,7 +49,7 @@ namespace IOlink
         int8_t numSDCIPorts;//I am not 100% sure how I want to handle ICs which have more than 1 IO-link ports
     };
 
-    enum messageHandlerState{
+    enum class messageHandlerState{
         INACTIVE,
         IDLE,
         GET_MESSAGE,
@@ -114,10 +116,10 @@ namespace IOlink
     ~SDCIPort(){};
 
     void begin(){
-        switch (master->getCfg().SDCI)
+        switch (Master::master->getCfg().SDCI)
         {
-        case SDCI_t::TIOL11X:
-            setPHY((PHY_t) {.comm = PHY_Comm_t::UART, .en = PHY_EN_t::BUILTIN, .fault = PHY_Fault_t::BUILTIN_LOGIC_LOW, .numSDCIPorts = 1});
+        case Master::SDCI_t::TIOL11X:
+            setPHY((PHY_t) {.comm = PHY_t::PHY_Comm_t::UART, .en = PHY_t::PHY_EN_t::BUILTIN, .fault = PHY_t::PHY_Fault_t::BUILTIN_LOGIC_LOW, .numSDCIPorts = 1});
             TIOL11X_init(port->getPortNum());
             break;
         default:
@@ -129,7 +131,7 @@ namespace IOlink
     void TIOL11X_init(uint8_t _port_num){
         //Some hardcoded pin mappings for the dev board
         if(_port_num == 1){
-            setConfig((HWConfig) {.serialPtr = &Serial, .PHY_Pins={.EN = 42, .Fault = 41, .Rx = 44, .Tx = 43}, .Power_Pins={.EN = 2, .IMON = 1}});
+            setConfig((HWConfig) {.serialPtr = &Serial, .PHY_Pins={.EN = 42, .Fault = 41, .Tx = 43, .Rx = 44}, .Power_Pins={.EN = 2, .IMON = 1}});
         } else if (_port_num == 2){
             //setConfig((HWConfig) {.serialPtr = &Serial1, .PHY_Pins={.EN = 21, .Fault = 22, .Rx = 18, .Tx = 17}, .Power_Pins={.EN = 20, .IMON = 19}});
         }
@@ -200,7 +202,7 @@ namespace IOlink
         {
             switch (PHY.en)
             {
-            case BUILTIN_LOGIC_LOW:
+            case PHY_t::PHY_EN_t::BUILTIN:
                 pinMode(config.PHY_Pins.EN, OUTPUT);
                 pinMode(config.PHY_Pins.EN, LOW);
                 break;
@@ -210,7 +212,7 @@ namespace IOlink
 
             switch (PHY.fault)
             {
-            case BUILTIN_LOGIC_LOW:
+            case PHY_t::Fault_t::BUILTIN_LOGIC_LOW:
                 pinMode(config.PHY_Pins.Fault, INPUT);
                 //Playing around with the idea of tying to an interrupt, might just check pin level periodically instead.
                 attachInterrupt(digitalPinToInterrupt(config.PHY_Pins.Fault), phyFault, FALLING);
@@ -307,9 +309,9 @@ namespace IOlink
       if (millis() - lastWake > WakeParameters::t_dwu)
       {
         //Not sure if you can do digital writes to pins after Serial.begin, might have to add a check and pause the serial port and reinit after
-        digitalWrite(config.PHY_pins.TX , HIGH);
+        digitalWrite(config.PHY_Pins.Tx , HIGH);
         delayMiroseconds(WakeParameters::t_wu);
-        digitalWrite(config.PHY_pins.TX, LOW);
+        digitalWrite(config.PHY_Pins.Tx, LOW);
         delayMicroseconds(WakeParameters::t_wu);
         lastWake = millis();
         wakeSuccess = true;
@@ -331,7 +333,7 @@ namespace IOlink
     {
       if (PHYEnable)
       {
-        digitalWrite(config.PHY_pins.EN, HIGH);
+        digitalWrite(config.PHY_Pins.EN, HIGH);
         PHYEnable = true;
       }
     };
@@ -341,7 +343,7 @@ namespace IOlink
     {
       if (!PHYEnable)
       {
-        digitalWrite(config.PHY_pins.EN, LOW);
+        digitalWrite(config.PHY_Pins.EN, LOW);
         PHYEnable = false;
       }
     };
@@ -380,7 +382,7 @@ namespace IOlink
                 //Attempt a wake up will only return true if the wake-up retry delay was
                 if (wakeUpRequest())
                 {
-                    for(int i = 0; i < BaudRate.length(); i++){
+                    for(int i = 0; i < sizeof(BaudRate); i++){
                         if(testBaud((BaudRate) i)){
                             setRates((BaudRate) i);
                             return (BaudRate) i;

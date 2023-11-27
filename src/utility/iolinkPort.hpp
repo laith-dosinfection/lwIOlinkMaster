@@ -15,7 +15,7 @@
 #include "sdci.hpp"
 #endif //SDCI
 
-#define DATA_SIZE 1
+#define DATA_SIZE 2
 
 namespace IOlink
 {

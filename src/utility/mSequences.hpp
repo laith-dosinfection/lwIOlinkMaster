@@ -10,7 +10,9 @@ namespace IOlink
     class sdciMessages
     {
 
-        /// @brief M Sequence control
+        public:
+
+                /// @brief M Sequence control
         /// @details M-Sequence Control octets are constructed from a packet consisting of:
         /// Bit 7: R/W bit
         /// Bit 6-5: Communication Channel
@@ -20,8 +22,8 @@ namespace IOlink
         // R/W bit
         enum r_w_t
         {
-        write,
-        read
+            write,
+            read
         };
 
         // Communication Channel
@@ -60,8 +62,6 @@ namespace IOlink
         };
         
         uint8_t ck8_seed = 0x52;
-
-        public:
 
         uint8_t CKS(EventFlag e, PDstatus s, uint8_t _checkSum){
             uint8_t checkSum = _checkSum;
