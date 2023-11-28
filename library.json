@@ -21,13 +21,6 @@
       }
     ],
     "license": "GPL-3.0-only",
-    "dependencies": [
-        {
-            "owner": "Anatoli Arkhipenko",
-            "name": "TaskScheduler",
-            "version": "^3.7.0"
-        }
-    ],
     "frameworks": "arduino",
     "platforms": "*"
   }
